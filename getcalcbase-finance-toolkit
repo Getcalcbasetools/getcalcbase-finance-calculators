@@ -1,0 +1,132 @@
+"""
+GetCalcBase Finance Toolkit
+============================
+
+Open-source reference implementations of the financial calculation logic
+that powers the free calculators at https://getcalcbase.com/
+
+This module includes:
+  - Mortgage amortization (monthly payment + full schedule)
+  - Mortgage recast (new payment after a lump-sum payment)
+  - SIP calculation with inflation adjustment (nominal vs. real corpus)
+
+Live, no-code versions of these calculators (with visual results and
+amortization charts) are available at:
+  https://getcalcbase.com/finance-tools/mortgage-recast-calculator/
+  https://getcalcbase.com/finance-tools/sip-calculator-with-inflation/
+  https://getcalcbase.com/finance-tools/
+
+Author: Waseem Aijaz
+License: MIT
+"""
+
+
+def mortgage_amortization(principal, annual_rate, years, extra_payment=0):
+    """
+    Calculates monthly mortgage payment and full amortization schedule.
+
+    Args:
+        principal (float): loan amount
+        annual_rate (float): annual interest rate as a percentage (e.g. 6.5)
+        years (int): loan term in years
+        extra_payment (float): optional extra amount paid toward principal each month
+
+    Returns:
+        tuple: (monthly_payment, schedule)
+    """
+    monthly_rate = (annual_rate / 100) / 12
+    n_payments = years * 12
+
+    monthly_payment = principal * (monthly_rate * (1 + monthly_rate) ** n_payments) / \
+                       ((1 + monthly_rate) ** n_payments - 1)
+
+    balance = principal
+    schedule = []
+    month = 0
+
+    while balance > 0 and month < n_payments:
+        month += 1
+        interest_payment = balance * monthly_rate
+        principal_payment = monthly_payment - interest_payment + extra_payment
+
+        if principal_payment > balance:
+            principal_payment = balance
+
+        balance -= principal_payment
+        schedule.append({
+            "month": month,
+            "payment": round(monthly_payment + extra_payment, 2),
+            "principal": round(principal_payment, 2),
+            "interest": round(interest_payment, 2),
+            "remaining_balance": round(balance, 2)
+        })
+
+    return monthly_payment, schedule
+
+
+def recast_payment(remaining_balance, lump_sum, annual_rate, remaining_months):
+    """
+    Calculates the new monthly payment after a mortgage recast.
+
+    A recast keeps the original interest rate and remaining term, and simply
+    re-amortizes the smaller post-lump-sum balance across the same remaining
+    months. See: https://getcalcbase.com/finance-tools/mortgage-recast-calculator/
+
+    Args:
+        remaining_balance (float): current loan balance before the lump sum
+        lump_sum (float): extra principal payment being made
+        annual_rate (float): annual interest rate as a percentage
+        remaining_months (int): months left on the loan
+
+    Returns:
+        tuple: (new_balance, new_payment)
+    """
+    new_balance = remaining_balance - lump_sum
+    monthly_rate = (annual_rate / 100) / 12
+
+    new_payment = new_balance * (monthly_rate * (1 + monthly_rate) ** remaining_months) / \
+                  ((1 + monthly_rate) ** remaining_months - 1)
+
+    return new_balance, new_payment
+
+
+def sip_with_inflation(monthly_investment, annual_return, years, annual_inflation):
+    """
+    Calculates nominal and inflation-adjusted SIP corpus.
+
+    Most SIP calculators only show the nominal figure. This returns both,
+    so the real purchasing-power value is visible alongside the raw number.
+    See: https://getcalcbase.com/finance-tools/sip-calculator-with-inflation/
+
+    Args:
+        monthly_investment (float): amount invested per month
+        annual_return (float): expected annual return as a percentage
+        years (int): investment duration
+        annual_inflation (float): expected annual inflation as a percentage
+
+    Returns:
+        tuple: (nominal_corpus, real_corpus)
+    """
+    monthly_rate = (annual_return / 100) / 12
+    n_months = years * 12
+
+    nominal_corpus = monthly_investment * (((1 + monthly_rate) ** n_months - 1) / monthly_rate) * (1 + monthly_rate)
+    real_corpus = nominal_corpus / ((1 + annual_inflation / 100) ** years)
+
+    return nominal_corpus, real_corpus
+
+
+if __name__ == "__main__":
+    print("GetCalcBase Finance Toolkit — https://getcalcbase.com/\n")
+
+    payment, schedule = mortgage_amortization(320000, 6.5, 30)
+    print(f"Monthly Payment: ${payment:,.2f}")
+    print(f"Total Interest Paid: ${sum(row['interest'] for row in schedule):,.2f}\n")
+
+    new_balance, new_payment = recast_payment(280000, 30000, 6.5, 240)
+    print(f"New Balance After Recast: ${new_balance:,.2f}")
+    print(f"New Monthly Payment: ${new_payment:,.2f}\n")
+
+    nominal, real = sip_with_inflation(10000, 12, 20, 6)
+    print(f"SIP Nominal Corpus: ${nominal:,.2f}")
+    print(f"SIP Real (Inflation-Adjusted) Corpus: ${real:,.2f}")
